@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Threading;
@@ -9,22 +10,26 @@ namespace UnzipperService
 {
     class UnzipperService
     {
-        // TODO: Add command line argument support
-        // TODO: Allow number of workers to be specified as command line arg
-        // TODO: Add readme with instructions on how to run using TopShelf
+        private readonly string sourceFolder;
+        private readonly string destinationFolder;
+        private readonly int workerTaskCount;
 
-        private const string sourceFolder = @"C:\UnzipperService\input";
-        private const string destinationFolder = @"C:\UnzipperService\output";
         private const string filter = "*.zip";
 
         private FileSystemWatcher fileSystemWatcher;
-
         private BlockingCollection<string> filesToUnzip;
 
         private CancellationTokenSource cancellationTokenSource;
         private CancellationToken cancellationToken;
 
-        private Task[] unzipperTasks;
+        private List<Task> unzipperTasks = new List<Task>();
+
+        public UnzipperService(string sourceFolder, string destinationFolder, int workerTaskCount)
+        {
+            this.sourceFolder = sourceFolder;
+            this.destinationFolder = destinationFolder;
+            this.workerTaskCount = workerTaskCount;
+        }
 
         public bool Start()
         {
@@ -38,13 +43,19 @@ namespace UnzipperService
             cancellationTokenSource = new CancellationTokenSource();
             cancellationToken = cancellationTokenSource.Token;
 
-            unzipperTasks = new[]
+            for (int i = 0; i < workerTaskCount; i++)
             {
-                Task.Factory.StartNew(() => UnzipperWorker(), cancellationToken),
-                Task.Factory.StartNew(() => UnzipperWorker(), cancellationToken),
-                Task.Factory.StartNew(() => UnzipperWorker(), cancellationToken),
-                Task.Factory.StartNew(() => UnzipperWorker(), cancellationToken)
-            };
+                unzipperTasks.Add(
+                    Task.Factory.StartNew(() => UnzipperWorker(), cancellationToken));
+            }
+
+            return true;
+        }
+
+        public bool Stop()
+        {
+            cancellationTokenSource.Cancel();
+            fileSystemWatcher.Dispose();
 
             return true;
         }
@@ -88,14 +99,6 @@ namespace UnzipperService
             {
                 Log($"Failed to unzip {name}. Reason: {ex.Message}");
             }
-        }
-
-        public bool Stop()
-        {
-            cancellationTokenSource.Cancel();
-            fileSystemWatcher.Dispose();
-
-            return true;
         }
 
         private void WaitUntilFileIsUnlocked(string fileName)
