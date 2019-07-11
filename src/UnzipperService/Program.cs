@@ -1,5 +1,4 @@
-﻿using System.Configuration;
-using Topshelf;
+﻿using Topshelf;
 
 namespace UnzipperService
 {
@@ -7,10 +6,10 @@ namespace UnzipperService
     {
         static void Main(string[] args)
         {
-            var sourceFolder = ConfigurationManager.AppSettings["sourceFolderPath"];
-            var destinationFolder = ConfigurationManager.AppSettings["destinationFolderPath"];
-            var workerTaskCount = int.Parse(ConfigurationManager.AppSettings["workerTaskCount"]);
+            // TODO: Add log to file option.
 
+            var config = UnzipperConfig.FromAppConfig();
+            
             HostFactory.Run(
                 serviceConfig =>
                 {
@@ -18,11 +17,12 @@ namespace UnzipperService
                         serviceInstance =>
                         {
                             serviceInstance.ConstructUsing(
-                                () => new UnzipperService(sourceFolder, destinationFolder, workerTaskCount));
+                                () => new UnzipperService(config));
 
                             serviceInstance.WhenStarted(execute => execute.Start());
                             serviceInstance.WhenStopped(execute => execute.Stop());
                         });
+
                     serviceConfig.SetDisplayName("Unzipper Service");
                     serviceConfig.SetDescription("Automatically unzips files placed in a specified folder");
                     serviceConfig.SetServiceName("UnzipperService");

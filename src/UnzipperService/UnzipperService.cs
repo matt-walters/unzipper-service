@@ -10,32 +10,27 @@ namespace UnzipperService
 {
     class UnzipperService
     {
-        private readonly string sourceFolder;
-        private readonly string destinationFolder;
-        private readonly int workerTaskCount;
-
         private const string filter = "*.zip";
 
+        private readonly UnzipperConfig config;
         private FileSystemWatcher fileSystemWatcher;
         private BlockingCollection<string> filesToUnzip;
 
         private CancellationTokenSource cancellationTokenSource;
         private CancellationToken cancellationToken;
 
-        private List<Task> unzipperTasks = new List<Task>();
+        private readonly List<Task> unzipperTasks = new List<Task>();
 
-        public UnzipperService(string sourceFolder, string destinationFolder, int workerTaskCount)
+        public UnzipperService(UnzipperConfig config)
         {
-            this.sourceFolder = sourceFolder;
-            this.destinationFolder = destinationFolder;
-            this.workerTaskCount = workerTaskCount;
+            this.config = config;
         }
 
         public bool Start()
         {
             filesToUnzip = new BlockingCollection<string>();
 
-            fileSystemWatcher = new FileSystemWatcher(sourceFolder, filter);
+            fileSystemWatcher = new FileSystemWatcher(config.SourceFolder, filter);
             fileSystemWatcher.Created += FileSystemWatcher_Created;
             fileSystemWatcher.EnableRaisingEvents = true;
             fileSystemWatcher.IncludeSubdirectories = false;
@@ -43,7 +38,7 @@ namespace UnzipperService
             cancellationTokenSource = new CancellationTokenSource();
             cancellationToken = cancellationTokenSource.Token;
 
-            for (int i = 0; i < workerTaskCount; i++)
+            for (int i = 0; i < config.WorkerTaskCount; i++)
             {
                 unzipperTasks.Add(
                     Task.Factory.StartNew(() => UnzipperWorker(), cancellationToken));
@@ -85,13 +80,18 @@ namespace UnzipperService
         private void UnzipFile(string fullPath)
         {
             var name = Path.GetFileName(fullPath);
-            var destinationFilePath = Path.Combine(destinationFolder, Path.GetFileNameWithoutExtension(fullPath));
+            var destinationFilePath = Path.Combine(config.DestinationFolder, Path.GetFileNameWithoutExtension(fullPath));
 
             WaitUntilFileIsUnlocked(fullPath);
 
             try
             {
                 ZipFile.ExtractToDirectory(fullPath, destinationFilePath);
+
+                if (config.DeleteFileAfterUnzip)
+                {
+                    File.Delete(fullPath);
+                }
 
                 Log($"Unzipped {name} ({filesToUnzip.Count} files remaining)");
             }
