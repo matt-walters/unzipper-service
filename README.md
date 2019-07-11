@@ -1,6 +1,6 @@
 # UnzipperService
 
-A Windows service that automatically extracts any zip files that placed in a specified folder.
+A Windows service that automatically extracts any zip files that are placed in a specified folder.
 The service is built with [TopShelf](http://topshelf-project.com/) which makes installing and starting the service super easy.
 
 ## Install
